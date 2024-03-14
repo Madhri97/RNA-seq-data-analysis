@@ -1,0 +1,63 @@
+library("readr")
+install.packages("openxlsx")
+library(openxlsx)
+
+library("DESeq2")
+library("ggplot2")
+
+#load the count matrix
+count_data<- read.csv("C:/Users/hp/Documents/Rna_seq_internship/count_data.csv", header= TRUE, row.names=1)
+colnames(count_data)
+head(count_data)
+
+
+# load the sample information
+sample_info <-read.csv("C:/Users/hp/Documents/Rna_seq_internship/sample_info.csv", header= TRUE, row.names=1)
+colnames(sample_info)
+head(sample_info)
+
+all(colnames(count_data) %in% rownames(sample_info))
+
+# constuct a deseqdataset 
+dds <-DESeqDataSetFromMatrix(countData =count_data, 
+                       colData = sample_info,
+                       design = ~Breast_cancer)
+
+dds
+
+
+#pre filtering 
+keep <- rowSums(counts(dds)) >=10
+dds <- dds[keep,]
+dds
+
+# set the factor level
+dds$Breast_cancer <- relevel(dds$Breast_cancer, ref= "Diseased")
+
+#run DESeq
+dds <- DESeq(dds)
+res <- results(dds)
+res
+summary(res)
+
+# Set the log2 fold change and p-value thresholds
+lfc_threshold <- 1  # Adjust as needed
+pvalue_threshold <- 0.01  # Adjust as needed
+
+# Filter the results based on thresholds and exclude NAs
+filtered_res <- res[abs(res$log2FoldChange) > lfc_threshold & res$pvalue < pvalue_threshold & !is.na(res$log2FoldChange) & !is.na(res$pvalue), ]
+filtered_res
+
+# Assuming 'res' is the DESeq2 results object
+res_df <- as.data.frame(res)
+
+volcano_plot <- ggplot(res_df, aes(x = log2FoldChange, y = -log10(pvalue))) +
+  geom_point(aes(color = abs(log2FoldChange) > lfc_threshold & -log10(pvalue) > pval_threshold), size = 1.5, alpha = 0.6) +
+  scale_color_manual(values = c("grey", "red"), labels = c("Not Significant", "Significant")) +
+  theme_minimal() +
+  labs(x = "Log2 Fold Change", y = "-log10(p-value)", title = "Volcano Plot")
+
+volcano_plot
+
+
+
